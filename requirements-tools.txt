@@ -1,0 +1,4 @@
+# No AGPL dependencies - using external tools instead
+# Optional libraries for enhanced functionality
+pikepdf>=8.0.0  # MIT licensed, for advanced PDF manipulation
+ocrmypdf>=14.0.0  # MIT licensed, optional for OCR capabilities

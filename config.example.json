@@ -1,0 +1,38 @@
+{
+  "replacements": [
+    {
+      "find": "John Doe",
+      "replace": "[NAME REDACTED]",
+      "regex": false
+    },
+    {
+      "find": "Jane Smith",
+      "replace": "[NAME REDACTED]",
+      "regex": false
+    },
+    {
+      "find": "\\d{3}-\\d{2}-\\d{4}",
+      "replace": "XXX-XX-XXXX",
+      "regex": true
+    },
+    {
+      "find": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+      "replace": "[EMAIL REDACTED]",
+      "regex": true
+    },
+    {
+      "find": "\\b(?:\\d[ -]*?){13,16}\\b",
+      "replace": "[CARD NUMBER REDACTED]",
+      "regex": true
+    },
+    {
+      "find": "\\$\\d+(?:,\\d{3})*(?:\\.\\d{2})?",
+      "replace": "[AMOUNT REDACTED]",
+      "regex": true
+    }
+  ],
+  "compression": {
+    "preserve": true,
+    "level": 9
+  }
+}

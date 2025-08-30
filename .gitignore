@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# Virtual environments
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+go/pdf-redactor
+go/pdf-redactor-*
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Java
+target/
+*.jar
+*.war
+*.ear
+*.class
+.classpath
+.project
+.settings/
+
+# C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test_output/
+*.pdf.bak
+redacted_*.pdf
+
+# Logs
+*.log
+
+# Temporary files
+temp/
+tmp/
