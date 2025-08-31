@@ -22,8 +22,15 @@ type ReplacementRule struct {
     CaseInsensitive bool   `json:"caseInsensitive"`
 }
 
+type ConfigReplacementRule struct {
+    Find           interface{} `json:"find"`  // Can be string or []string
+    Replace        string      `json:"replace"`
+    Regex          bool        `json:"regex"`
+    CaseInsensitive bool        `json:"caseInsensitive"`
+}
+
 type Config struct {
-    Replacements []ReplacementRule `json:"replacements"`
+    Replacements []ConfigReplacementRule `json:"replacements"`
     Compression  struct {
         Preserve bool `json:"preserve"`
         Level    int  `json:"level"`
@@ -82,7 +89,32 @@ func (r *PDFRedactor) LoadConfig(configPath string) error {
         return err
     }
 
-    r.replacements = append(r.replacements, config.Replacements...)
+    for _, configRule := range config.Replacements {
+        // Support both single string and array of strings for 'find'
+        var findPatterns []string
+        
+        switch v := configRule.Find.(type) {
+        case string:
+            // Single pattern (backward compatibility)
+            findPatterns = []string{v}
+        case []interface{}:
+            // Array of patterns
+            for _, pattern := range v {
+                if str, ok := pattern.(string); ok {
+                    findPatterns = append(findPatterns, str)
+                } else {
+                    return fmt.Errorf("Invalid 'find' array element: %v. Must be string.", pattern)
+                }
+            }
+        default:
+            return fmt.Errorf("Invalid 'find' value: %v. Must be string or array of strings.", v)
+        }
+        
+        // Create replacement rule for each pattern
+        for _, pattern := range findPatterns {
+            r.AddReplacementWithCase(pattern, configRule.Replace, configRule.Regex, configRule.CaseInsensitive)
+        }
+    }
     
     // Apply compression settings
     if !config.Compression.Preserve {

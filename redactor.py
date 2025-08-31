@@ -41,12 +41,22 @@ class PDFRedactor:
             config = json.load(f)
             
         for rule in config.get('replacements', []):
-            self.add_replacement(
-                rule['find'],
-                rule['replace'],
-                rule.get('regex', False),
-                rule.get('caseInsensitive', False)
-            )
+            # Support both single string and array of strings for 'find'
+            find_patterns = rule['find']
+            if isinstance(find_patterns, str):
+                # Single pattern (backward compatibility)
+                find_patterns = [find_patterns]
+            elif not isinstance(find_patterns, list):
+                raise ValueError(f"Invalid 'find' value: {find_patterns}. Must be string or array of strings.")
+            
+            # Create replacement rule for each pattern
+            for pattern in find_patterns:
+                self.add_replacement(
+                    pattern,
+                    rule['replace'],
+                    rule.get('regex', False),
+                    rule.get('caseInsensitive', False)
+                )
         
         # Load compression settings if present
         if 'compression' in config:

@@ -61,9 +61,40 @@ public class PDFRedactor {
     public void loadConfig(String configPath) throws IOException {
         Gson gson = new Gson();
         try (Reader reader = new FileReader(configPath)) {
-            Config config = gson.fromJson(reader, Config.class);
-            if (config.replacements != null) {
-                replacements.addAll(config.replacements);
+            // Parse as JsonObject to handle flexible 'find' field
+            com.google.gson.JsonObject jsonConfig = gson.fromJson(reader, com.google.gson.JsonObject.class);
+            
+            if (jsonConfig.has("replacements")) {
+                com.google.gson.JsonArray replacementsArray = jsonConfig.getAsJsonArray("replacements");
+                
+                for (com.google.gson.JsonElement element : replacementsArray) {
+                    com.google.gson.JsonObject rule = element.getAsJsonObject();
+                    
+                    // Support both single string and array of strings for 'find'
+                    String[] findPatterns;
+                    com.google.gson.JsonElement findElement = rule.get("find");
+                    
+                    if (findElement.isJsonArray()) {
+                        // Array of patterns
+                        com.google.gson.JsonArray findArray = findElement.getAsJsonArray();
+                        findPatterns = new String[findArray.size()];
+                        for (int i = 0; i < findArray.size(); i++) {
+                            findPatterns[i] = findArray.get(i).getAsString();
+                        }
+                    } else {
+                        // Single pattern (backward compatibility)
+                        findPatterns = new String[]{findElement.getAsString()};
+                    }
+                    
+                    String replace = rule.get("replace").getAsString();
+                    boolean regex = rule.has("regex") ? rule.get("regex").getAsBoolean() : false;
+                    boolean caseInsensitive = rule.has("caseInsensitive") ? rule.get("caseInsensitive").getAsBoolean() : false;
+                    
+                    // Create replacement rule for each pattern
+                    for (String pattern : findPatterns) {
+                        addReplacement(pattern, replace, regex, caseInsensitive);
+                    }
+                }
             }
         }
     }
