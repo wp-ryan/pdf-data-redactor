@@ -39,9 +39,34 @@ namespace PDFRedactor
         public bool Regex { get; set; }
     }
 
+    // Helper class for loading config that supports both string and array for Find field
+    public class ConfigReplacementRule
+    {
+        private object _find;
+        
+        public object Find 
+        { 
+            get => _find;
+            set => _find = value;
+        }
+        public string Replace { get; set; }
+        public bool Regex { get; set; }
+
+        // Helper method to get find patterns as a list
+        public List<string> GetFindPatterns()
+        {
+            if (_find is string stringValue)
+                return new List<string> { stringValue };
+            else if (_find is Newtonsoft.Json.Linq.JArray arrayValue)
+                return arrayValue.ToObject<List<string>>();
+            else
+                return new List<string>();
+        }
+    }
+
     public class Config
     {
-        public List<ReplacementRule> Replacements { get; set; }
+        public List<ConfigReplacementRule> Replacements { get; set; }
     }
 
     class PDFRedactor
@@ -62,7 +87,20 @@ namespace PDFRedactor
         {
             var json = File.ReadAllText(configPath);
             var config = JsonConvert.DeserializeObject<Config>(json);
-            replacements.AddRange(config.Replacements);
+            
+            foreach (var configRule in config.Replacements)
+            {
+                var findPatterns = configRule.GetFindPatterns();
+                foreach (var pattern in findPatterns)
+                {
+                    replacements.Add(new ReplacementRule
+                    {
+                        Find = pattern,
+                        Replace = configRule.Replace,
+                        Regex = configRule.Regex
+                    });
+                }
+            }
         }
 
         public string ProcessText(string text)

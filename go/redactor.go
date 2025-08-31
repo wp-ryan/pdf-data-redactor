@@ -21,8 +21,33 @@ type ReplacementRule struct {
     Regex   bool   `json:"regex"`
 }
 
+// Helper struct for loading config that supports both string and array for Find field
+type ConfigReplacementRule struct {
+    Find    interface{} `json:"find"`
+    Replace string      `json:"replace"`
+    Regex   bool        `json:"regex"`
+}
+
+// GetFindPatterns returns the find patterns as a slice of strings
+func (r *ConfigReplacementRule) GetFindPatterns() []string {
+    switch v := r.Find.(type) {
+    case string:
+        return []string{v}
+    case []interface{}:
+        patterns := make([]string, len(v))
+        for i, pattern := range v {
+            if str, ok := pattern.(string); ok {
+                patterns[i] = str
+            }
+        }
+        return patterns
+    default:
+        return []string{}
+    }
+}
+
 type Config struct {
-    Replacements []ReplacementRule `json:"replacements"`
+    Replacements []ConfigReplacementRule `json:"replacements"`
     Compression  struct {
         Preserve bool `json:"preserve"`
         Level    int  `json:"level"`
@@ -71,7 +96,17 @@ func (r *PDFRedactor) LoadConfig(configPath string) error {
         return err
     }
 
-    r.replacements = append(r.replacements, config.Replacements...)
+    // Process each config rule and expand multiple find patterns
+    for _, configRule := range config.Replacements {
+        findPatterns := configRule.GetFindPatterns()
+        for _, pattern := range findPatterns {
+            r.replacements = append(r.replacements, ReplacementRule{
+                Find:    pattern,
+                Replace: configRule.Replace,
+                Regex:   configRule.Regex,
+            })
+        }
+    }
     
     // Apply compression settings
     if !config.Compression.Preserve {

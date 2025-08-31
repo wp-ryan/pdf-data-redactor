@@ -1,0 +1,33 @@
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "Jane Smith", "Bob Johnson"],
+      "replace": "[NAME REDACTED]",
+      "regex": false
+    },
+    {
+      "find": "confidential",
+      "replace": "[REDACTED]",
+      "regex": false
+    },
+    {
+      "find": ["secret", "private", "sensitive"],
+      "replace": "[SENSITIVE DATA]",
+      "regex": false
+    },
+    {
+      "find": "\\d{3}-\\d{2}-\\d{4}",
+      "replace": "XXX-XX-XXXX",
+      "regex": true
+    },
+    {
+      "find": ["\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b", "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"],
+      "replace": "[EMAIL REDACTED]",
+      "regex": true
+    }
+  ],
+  "compression": {
+    "preserve": true,
+    "level": 9
+  }
+}

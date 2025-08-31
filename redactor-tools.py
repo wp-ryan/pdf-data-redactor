@@ -42,13 +42,20 @@ class PDFRedactorTools:
             logger.error("  Windows: Use WSL or install tools individually")
             sys.exit(1)
     
-    def add_replacement(self, find: str, replace: str, is_regex: bool = False):
-        """Add a replacement rule"""
-        self.replacements.append({
-            'find': find,
-            'replace': replace,
-            'regex': is_regex
-        })
+    def add_replacement(self, find, replace: str, is_regex: bool = False):
+        """Add a replacement rule - find can be a string or list of strings"""
+        # Support both string and list for find parameter
+        if isinstance(find, str):
+            find_patterns = [find]
+        else:
+            find_patterns = find
+        
+        for pattern in find_patterns:
+            self.replacements.append({
+                'find': pattern,
+                'replace': replace,
+                'regex': is_regex
+            })
     
     def load_config(self, config_path: str):
         """Load replacement rules from configuration file"""

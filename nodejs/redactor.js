@@ -15,7 +15,12 @@ class PDFRedactor {
     }
 
     addReplacement(find, replace, isRegex = false) {
-        this.replacements.push({ find, replace, isRegex });
+        // Support both string and array for find parameter
+        const findPatterns = Array.isArray(find) ? find : [find];
+        
+        for (const pattern of findPatterns) {
+            this.replacements.push({ find: pattern, replace, isRegex });
+        }
     }
 
     async loadConfig(configPath) {

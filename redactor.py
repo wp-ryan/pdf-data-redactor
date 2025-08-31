@@ -26,13 +26,20 @@ class PDFRedactor:
         self.preserve_compression = True
         self.compression_level = 9  # 0-9, where 9 is maximum compression
     
-    def add_replacement(self, find: str, replace: str, is_regex: bool = False):
-        """Add a replacement rule"""
-        self.replacements.append({
-            'find': find,
-            'replace': replace,
-            'regex': is_regex
-        })
+    def add_replacement(self, find, replace: str, is_regex: bool = False):
+        """Add a replacement rule - find can be a string or list of strings"""
+        # Support both string and list for find parameter
+        if isinstance(find, str):
+            find_patterns = [find]
+        else:
+            find_patterns = find
+        
+        for pattern in find_patterns:
+            self.replacements.append({
+                'find': pattern,
+                'replace': replace,
+                'regex': is_regex
+            })
     
     def load_config(self, config_path: str):
         """Load replacement rules from configuration file"""
