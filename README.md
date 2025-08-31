@@ -6,12 +6,42 @@ A console application for replacing sensitive data in PDF files using string rep
 
 - Replace text in PDF files using string patterns
 - Support for regular expressions
+- Case insensitive matching support
 - Automatic handling of compressed PDFs
 - Preserves original compression settings or applies custom compression
 - Batch processing of multiple PDFs
 - Configuration file support for replacement rules
 - PDF information inspection tool
 - Preserve PDF formatting and structure
+
+## Configuration Format
+
+Replacement rules can be configured using a JSON file. Each rule supports the following properties:
+
+- `find` - The text or pattern to find
+- `replace` - The replacement text
+- `regex` - Boolean flag for regular expression matching (default: false)
+- `caseInsensitive` - Boolean flag for case insensitive matching (default: false)
+
+Example configuration file:
+```json
+{
+  "replacements": [
+    {
+      "find": "John Doe",
+      "replace": "[NAME REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b",
+      "replace": "[EMAIL REDACTED]",
+      "regex": true,
+      "caseInsensitive": true
+    }
+  ]
+}
+```
 
 ## Implementation Options
 
