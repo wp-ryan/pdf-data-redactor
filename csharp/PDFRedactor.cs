@@ -37,6 +37,7 @@ namespace PDFRedactor
         public string Find { get; set; }
         public string Replace { get; set; }
         public bool Regex { get; set; }
+        public bool CaseInsensitive { get; set; }
     }
 
     public class Config
@@ -48,13 +49,14 @@ namespace PDFRedactor
     {
         private List<ReplacementRule> replacements = new List<ReplacementRule>();
 
-        public void AddReplacement(string find, string replace, bool isRegex = false)
+        public void AddReplacement(string find, string replace, bool isRegex = false, bool caseInsensitive = false)
         {
             replacements.Add(new ReplacementRule 
             { 
                 Find = find, 
                 Replace = replace, 
-                Regex = isRegex 
+                Regex = isRegex,
+                CaseInsensitive = caseInsensitive
             });
         }
 
@@ -73,11 +75,40 @@ namespace PDFRedactor
             {
                 if (rule.Regex)
                 {
-                    result = Regex.Replace(result, rule.Find, rule.Replace);
+                    var options = rule.CaseInsensitive ? RegexOptions.IgnoreCase : RegexOptions.None;
+                    result = Regex.Replace(result, rule.Find, rule.Replace, options);
                 }
                 else
                 {
-                    result = result.Replace(rule.Find, rule.Replace);
+                    if (rule.CaseInsensitive)
+                    {
+                        // Case insensitive string replacement
+                        var comparison = StringComparison.OrdinalIgnoreCase;
+                        var findLength = rule.Find.Length;
+                        var sb = new StringBuilder();
+                        int lastPos = 0;
+                        int pos = result.IndexOf(rule.Find, comparison);
+                        
+                        while (pos != -1)
+                        {
+                            // Add text before the match
+                            sb.Append(result.Substring(lastPos, pos - lastPos));
+                            // Add the replacement
+                            sb.Append(rule.Replace);
+                            // Move past the match
+                            lastPos = pos + findLength;
+                            // Find next occurrence
+                            pos = result.IndexOf(rule.Find, lastPos, comparison);
+                        }
+                        
+                        // Add remaining text
+                        sb.Append(result.Substring(lastPos));
+                        result = sb.ToString();
+                    }
+                    else
+                    {
+                        result = result.Replace(rule.Find, rule.Replace);
+                    }
                 }
             }
             

@@ -42,12 +42,13 @@ class PDFRedactorTools:
             logger.error("  Windows: Use WSL or install tools individually")
             sys.exit(1)
     
-    def add_replacement(self, find: str, replace: str, is_regex: bool = False):
+    def add_replacement(self, find: str, replace: str, is_regex: bool = False, case_insensitive: bool = False):
         """Add a replacement rule"""
         self.replacements.append({
             'find': find,
             'replace': replace,
-            'regex': is_regex
+            'regex': is_regex,
+            'caseInsensitive': case_insensitive
         })
     
     def load_config(self, config_path: str):
@@ -59,7 +60,8 @@ class PDFRedactorTools:
             self.add_replacement(
                 rule['find'],
                 rule['replace'],
-                rule.get('regex', False)
+                rule.get('regex', False),
+                rule.get('caseInsensitive', False)
             )
     
     def process_text(self, text: str) -> str:
@@ -68,9 +70,37 @@ class PDFRedactorTools:
         
         for rule in self.replacements:
             if rule['regex']:
-                result = re.sub(rule['find'], rule['replace'], result)
+                flags = re.IGNORECASE if rule.get('caseInsensitive', False) else 0
+                result = re.sub(rule['find'], rule['replace'], result, flags=flags)
             else:
-                result = result.replace(rule['find'], rule['replace'])
+                if rule.get('caseInsensitive', False):
+                    # For case insensitive string replacement, we need to find all occurrences
+                    # while preserving the original case of the surrounding text
+                    find_text = rule['find']
+                    replace_text = rule['replace']
+                    result_lower = result.lower()
+                    find_lower = find_text.lower()
+                    
+                    # Find all positions where the text occurs (case insensitive)
+                    new_result = ""
+                    last_pos = 0
+                    pos = result_lower.find(find_lower)
+                    
+                    while pos != -1:
+                        # Add text before the match
+                        new_result += result[last_pos:pos]
+                        # Add the replacement
+                        new_result += replace_text
+                        # Move past the match
+                        last_pos = pos + len(find_text)
+                        # Find next occurrence
+                        pos = result_lower.find(find_lower, last_pos)
+                    
+                    # Add remaining text
+                    new_result += result[last_pos:]
+                    result = new_result
+                else:
+                    result = result.replace(rule['find'], rule['replace'])
         
         return result
     

@@ -16,9 +16,10 @@ import (
 )
 
 type ReplacementRule struct {
-    Find    string `json:"find"`
-    Replace string `json:"replace"`
-    Regex   bool   `json:"regex"`
+    Find           string `json:"find"`
+    Replace        string `json:"replace"`
+    Regex          bool   `json:"regex"`
+    CaseInsensitive bool   `json:"caseInsensitive"`
 }
 
 type Config struct {
@@ -54,9 +55,19 @@ func (r *PDFRedactor) SetCompressionLevel(level int) {
 
 func (r *PDFRedactor) AddReplacement(find, replace string, isRegex bool) {
     r.replacements = append(r.replacements, ReplacementRule{
-        Find:    find,
-        Replace: replace,
-        Regex:   isRegex,
+        Find:           find,
+        Replace:        replace,
+        Regex:          isRegex,
+        CaseInsensitive: false,
+    })
+}
+
+func (r *PDFRedactor) AddReplacementWithCase(find, replace string, isRegex, caseInsensitive bool) {
+    r.replacements = append(r.replacements, ReplacementRule{
+        Find:           find,
+        Replace:        replace,
+        Regex:          isRegex,
+        CaseInsensitive: caseInsensitive,
     })
 }
 
@@ -87,10 +98,45 @@ func (r *PDFRedactor) ProcessText(text string) string {
     
     for _, rule := range r.replacements {
         if rule.Regex {
-            re := regexp.MustCompile(rule.Find)
+            pattern := rule.Find
+            if rule.CaseInsensitive {
+                pattern = "(?i)" + pattern
+            }
+            re := regexp.MustCompile(pattern)
             result = re.ReplaceAllString(result, rule.Replace)
         } else {
-            result = strings.ReplaceAll(result, rule.Find, rule.Replace)
+            if rule.CaseInsensitive {
+                // Case insensitive string replacement
+                findLower := strings.ToLower(rule.Find)
+                resultLower := strings.ToLower(result)
+                newResult := ""
+                lastPos := 0
+                pos := strings.Index(resultLower, findLower)
+                
+                for pos != -1 {
+                    // Add text before the match
+                    newResult += result[lastPos:pos]
+                    // Add the replacement
+                    newResult += rule.Replace
+                    // Move past the match
+                    lastPos = pos + len(rule.Find)
+                    // Find next occurrence
+                    if lastPos < len(resultLower) {
+                        pos = strings.Index(resultLower[lastPos:], findLower)
+                        if pos != -1 {
+                            pos += lastPos
+                        }
+                    } else {
+                        pos = -1
+                    }
+                }
+                
+                // Add remaining text
+                newResult += result[lastPos:]
+                result = newResult
+            } else {
+                result = strings.ReplaceAll(result, rule.Find, rule.Replace)
+            }
         }
     }
     

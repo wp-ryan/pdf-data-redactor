@@ -23,11 +23,20 @@ public class PDFRedactor {
         String find;
         String replace;
         boolean regex;
+        boolean caseInsensitive;
         
         ReplacementRule(String find, String replace, boolean regex) {
             this.find = find;
             this.replace = replace;
             this.regex = regex;
+            this.caseInsensitive = false;
+        }
+        
+        ReplacementRule(String find, String replace, boolean regex, boolean caseInsensitive) {
+            this.find = find;
+            this.replace = replace;
+            this.regex = regex;
+            this.caseInsensitive = caseInsensitive;
         }
     }
     
@@ -45,6 +54,10 @@ public class PDFRedactor {
         replacements.add(new ReplacementRule(find, replace, isRegex));
     }
     
+    public void addReplacement(String find, String replace, boolean isRegex, boolean caseInsensitive) {
+        replacements.add(new ReplacementRule(find, replace, isRegex, caseInsensitive));
+    }
+    
     public void loadConfig(String configPath) throws IOException {
         Gson gson = new Gson();
         try (Reader reader = new FileReader(configPath)) {
@@ -60,9 +73,37 @@ public class PDFRedactor {
         
         for (ReplacementRule rule : replacements) {
             if (rule.regex) {
-                result = result.replaceAll(rule.find, rule.replace);
+                if (rule.caseInsensitive) {
+                    Pattern pattern = Pattern.compile(rule.find, Pattern.CASE_INSENSITIVE);
+                    result = pattern.matcher(result).replaceAll(rule.replace);
+                } else {
+                    result = result.replaceAll(rule.find, rule.replace);
+                }
             } else {
-                result = result.replace(rule.find, rule.replace);
+                if (rule.caseInsensitive) {
+                    // Case insensitive string replacement
+                    String findLower = rule.find.toLowerCase();
+                    StringBuilder newResult = new StringBuilder();
+                    int lastPos = 0;
+                    int pos = result.toLowerCase().indexOf(findLower);
+                    
+                    while (pos != -1) {
+                        // Add text before the match
+                        newResult.append(result.substring(lastPos, pos));
+                        // Add the replacement
+                        newResult.append(rule.replace);
+                        // Move past the match
+                        lastPos = pos + rule.find.length();
+                        // Find next occurrence
+                        pos = result.toLowerCase().indexOf(findLower, lastPos);
+                    }
+                    
+                    // Add remaining text
+                    newResult.append(result.substring(lastPos));
+                    result = newResult.toString();
+                } else {
+                    result = result.replace(rule.find, rule.replace);
+                }
             }
         }
         

@@ -14,8 +14,8 @@ class PDFRedactor {
         this.replacements = [];
     }
 
-    addReplacement(find, replace, isRegex = false) {
-        this.replacements.push({ find, replace, isRegex });
+    addReplacement(find, replace, isRegex = false, caseInsensitive = false) {
+        this.replacements.push({ find, replace, isRegex, caseInsensitive });
     }
 
     async loadConfig(configPath) {
@@ -23,7 +23,7 @@ class PDFRedactor {
         const config = JSON.parse(configText);
         
         for (const rule of config.replacements || []) {
-            this.addReplacement(rule.find, rule.replace, rule.regex || false);
+            this.addReplacement(rule.find, rule.replace, rule.regex || false, rule.caseInsensitive || false);
         }
     }
 
@@ -32,9 +32,34 @@ class PDFRedactor {
         
         for (const rule of this.replacements) {
             if (rule.isRegex) {
-                result = result.replace(new RegExp(rule.find, 'g'), rule.replace);
+                const flags = rule.caseInsensitive ? 'gi' : 'g';
+                result = result.replace(new RegExp(rule.find, flags), rule.replace);
             } else {
-                result = result.split(rule.find).join(rule.replace);
+                if (rule.caseInsensitive) {
+                    // Case insensitive string replacement
+                    const findLower = rule.find.toLowerCase();
+                    const resultLower = result.toLowerCase();
+                    let newResult = '';
+                    let lastPos = 0;
+                    let pos = resultLower.indexOf(findLower);
+                    
+                    while (pos !== -1) {
+                        // Add text before the match
+                        newResult += result.substring(lastPos, pos);
+                        // Add the replacement
+                        newResult += rule.replace;
+                        // Move past the match
+                        lastPos = pos + rule.find.length;
+                        // Find next occurrence
+                        pos = resultLower.indexOf(findLower, lastPos);
+                    }
+                    
+                    // Add remaining text
+                    newResult += result.substring(lastPos);
+                    result = newResult;
+                } else {
+                    result = result.split(rule.find).join(rule.replace);
+                }
             }
         }
         
