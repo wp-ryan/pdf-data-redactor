@@ -1,0 +1,42 @@
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "jane smith", "Bob Johnson", "Alice Cooper"],
+      "replace": "[NAME REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": ["123-45-6789", "987-65-4321", "555-12-3456", "111-22-3333"],
+      "replace": "XXX-XX-XXXX",
+      "regex": false
+    },
+    {
+      "find": ["john.doe@company.com", "jane.smith@company.com", "bob.johnson@company.com"],
+      "replace": "[EMAIL REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": ["Confidential", "CONFIDENTIAL", "Private", "PRIVATE"],
+      "replace": "[CLASSIFIED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+      "replace": "[EMAIL REDACTED]",
+      "regex": true,
+      "caseInsensitive": true
+    },
+    {
+      "find": "legacy single pattern",
+      "replace": "[LEGACY REDACTED]",
+      "regex": false
+    }
+  ],
+  "compression": {
+    "preserve": true,
+    "level": 9
+  }
+}
