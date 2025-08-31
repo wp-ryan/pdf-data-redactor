@@ -6,9 +6,10 @@
       "regex": false
     },
     {
-      "find": "Jane Smith",
+      "find": "jane smith",
       "replace": "[NAME REDACTED]",
-      "regex": false
+      "regex": false,
+      "caseInsensitive": true
     },
     {
       "find": "\\d{3}-\\d{2}-\\d{4}",
@@ -18,7 +19,8 @@
     {
       "find": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
       "replace": "[EMAIL REDACTED]",
-      "regex": true
+      "regex": true,
+      "caseInsensitive": true
     },
     {
       "find": "\\b(?:\\d[ -]*?){13,16}\\b",
