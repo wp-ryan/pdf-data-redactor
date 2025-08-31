@@ -1,12 +1,7 @@
 {
   "replacements": [
     {
-      "find": "John Doe",
-      "replace": "[NAME REDACTED]",
-      "regex": false
-    },
-    {
-      "find": "Jane Smith",
+      "find": ["John Doe", "Jane Smith"],
       "replace": "[NAME REDACTED]",
       "regex": false
     },
@@ -26,7 +21,7 @@
       "regex": true
     },
     {
-      "find": "\\$\\d+(?:,\\d{3})*(?:\\.\\d{2})?",
+      "find": ["\\$\\d+(?:,\\d{3})*(?:\\.\\d{2})?", "USD \\d+(?:,\\d{3})*(?:\\.\\d{2})?"],
       "replace": "[AMOUNT REDACTED]",
       "regex": true
     }

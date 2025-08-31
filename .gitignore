@@ -65,6 +65,10 @@ test_output/
 *.pdf.bak
 redacted_*.pdf
 
+# Test files (development/validation only)
+test_*.py
+test_*.go
+
 # Logs
 *.log
 

@@ -6,12 +6,85 @@ A console application for replacing sensitive data in PDF files using string rep
 
 - Replace text in PDF files using string patterns
 - Support for regular expressions
+- **Multiple find patterns per replacement rule** - specify multiple text patterns that should use the same replacement text
 - Automatic handling of compressed PDFs
 - Preserves original compression settings or applies custom compression
 - Batch processing of multiple PDFs
 - Configuration file support for replacement rules
 - PDF information inspection tool
 - Preserve PDF formatting and structure
+
+## Configuration File Format
+
+The PDF Data Redactor supports JSON configuration files for defining replacement rules. The configuration supports both single and multiple find patterns per replacement rule.
+
+### Basic Configuration Structure
+
+```json
+{
+  "replacements": [
+    {
+      "find": "text to find",
+      "replace": "replacement text",
+      "regex": false
+    }
+  ],
+  "compression": {
+    "preserve": true,
+    "level": 9
+  }
+}
+```
+
+### Multiple Find Patterns (New Feature)
+
+You can now specify multiple text patterns that should use the same replacement text:
+
+```json
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "Jane Smith", "Bob Johnson"],
+      "replace": "[NAME REDACTED]",
+      "regex": false
+    },
+    {
+      "find": ["confidential", "secret", "private"],
+      "replace": "[SENSITIVE DATA REMOVED]",
+      "regex": false
+    }
+  ]
+}
+```
+
+### Mixed Configuration
+
+You can mix single strings and arrays in the same configuration:
+
+```json
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "Jane Smith"],
+      "replace": "[NAME REDACTED]",
+      "regex": false
+    },
+    {
+      "find": "\\d{3}-\\d{2}-\\d{4}",
+      "replace": "XXX-XX-XXXX",
+      "regex": true
+    }
+  ]
+}
+```
+
+### Configuration Fields
+
+- `find`: String or array of strings to search for
+- `replace`: Text to replace matches with
+- `regex`: Boolean indicating whether to treat find patterns as regular expressions
+- `compression.preserve`: Whether to preserve original PDF compression
+- `compression.level`: Compression level (0-9, where 9 is maximum compression)
 
 ## Implementation Options
 
