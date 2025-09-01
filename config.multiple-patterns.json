@@ -1,0 +1,30 @@
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "jane smith", "Bob Johnson"],
+      "replace": "[NAME REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": ["123-45-6789", "987-65-4321"],
+      "replace": "XXX-XX-XXXX",
+      "regex": false
+    },
+    {
+      "find": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+      "replace": "[EMAIL REDACTED]",
+      "regex": true,
+      "caseInsensitive": true
+    },
+    {
+      "find": "single pattern test",
+      "replace": "[SINGLE REDACTED]",
+      "regex": false
+    }
+  ],
+  "compression": {
+    "preserve": true,
+    "level": 9
+  }
+}

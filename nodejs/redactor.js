@@ -23,7 +23,22 @@ class PDFRedactor {
         const config = JSON.parse(configText);
         
         for (const rule of config.replacements || []) {
-            this.addReplacement(rule.find, rule.replace, rule.regex || false, rule.caseInsensitive || false);
+            // Support both single string and array of strings for 'find'
+            let findPatterns;
+            if (typeof rule.find === 'string') {
+                // Single pattern (backward compatibility)
+                findPatterns = [rule.find];
+            } else if (Array.isArray(rule.find)) {
+                // Array of patterns
+                findPatterns = rule.find;
+            } else {
+                throw new Error(`Invalid 'find' value: ${rule.find}. Must be string or array of strings.`);
+            }
+            
+            // Create replacement rule for each pattern
+            for (const pattern of findPatterns) {
+                this.addReplacement(pattern, rule.replace, rule.regex || false, rule.caseInsensitive || false);
+            }
         }
     }
 

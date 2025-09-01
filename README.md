@@ -18,10 +18,77 @@ A console application for replacing sensitive data in PDF files using string rep
 
 Replacement rules can be configured using a JSON file. Each rule supports the following properties:
 
-- `find` - The text or pattern to find
+- `find` - The text or pattern to find (can be a single string or an array of strings)
 - `replace` - The replacement text
 - `regex` - Boolean flag for regular expression matching (default: false)
 - `caseInsensitive` - Boolean flag for case insensitive matching (default: false)
+
+### Multiple Patterns Support
+
+You can specify multiple text patterns that share the same replacement text in a single configuration entry, reducing config file duplication and improving maintainability:
+
+```json
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "jane smith", "Bob Johnson"],
+      "replace": "[NAME REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": ["123-45-6789", "987-65-4321", "555-12-3456"],
+      "replace": "XXX-XX-XXXX",
+      "regex": false
+    },
+    {
+      "find": ["Confidential", "CONFIDENTIAL", "Private", "PRIVATE"],
+      "replace": "[CLASSIFIED]",
+      "regex": false,
+      "caseInsensitive": true
+    }
+  ]
+}
+```
+
+This approach offers several benefits:
+- **Reduced duplication**: Multiple patterns sharing the same replacement don't need separate entries
+- **Easier maintenance**: Update replacement text in one place for multiple patterns
+- **Cleaner configuration**: Grouping related patterns together improves readability
+- **Consistent formatting**: All related patterns get exactly the same replacement text
+
+### Mixed Configuration
+
+You can mix both single patterns and multiple patterns in the same configuration file:
+
+```json
+{
+  "replacements": [
+    {
+      "find": ["John Doe", "jane smith", "Bob Johnson"],
+      "replace": "[NAME REDACTED]",
+      "regex": false,
+      "caseInsensitive": true
+    },
+    {
+      "find": "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b",
+      "replace": "[EMAIL REDACTED]",
+      "regex": true,
+      "caseInsensitive": true
+    },
+    {
+      "find": ["Confidential", "Top Secret"],
+      "replace": "[CLASSIFIED]",
+      "regex": false,
+      "caseInsensitive": true
+    }
+  ]
+}
+```
+
+### Single Pattern (Backward Compatible)
+
+The traditional single-string format is still fully supported:
 
 Example configuration file:
 ```json

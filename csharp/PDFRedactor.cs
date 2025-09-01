@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using PdfSharp.Pdf;
@@ -40,9 +41,17 @@ namespace PDFRedactor
         public bool CaseInsensitive { get; set; }
     }
 
+    public class ConfigReplacementRule
+    {
+        public object Find { get; set; }  // Can be string or string[]
+        public string Replace { get; set; }
+        public bool Regex { get; set; }
+        public bool CaseInsensitive { get; set; }
+    }
+
     public class Config
     {
-        public List<ReplacementRule> Replacements { get; set; }
+        public List<ConfigReplacementRule> Replacements { get; set; }
     }
 
     class PDFRedactor
@@ -64,7 +73,36 @@ namespace PDFRedactor
         {
             var json = File.ReadAllText(configPath);
             var config = JsonConvert.DeserializeObject<Config>(json);
-            replacements.AddRange(config.Replacements);
+            
+            foreach (var configRule in config.Replacements)
+            {
+                // Support both single string and array of strings for 'find'
+                List<string> findPatterns = new List<string>();
+                
+                if (configRule.Find is string singlePattern)
+                {
+                    // Single pattern (backward compatibility)
+                    findPatterns.Add(singlePattern);
+                }
+                else if (configRule.Find is Newtonsoft.Json.Linq.JArray arrayPatterns)
+                {
+                    // Array of patterns
+                    foreach (var pattern in arrayPatterns)
+                    {
+                        findPatterns.Add(pattern.ToString());
+                    }
+                }
+                else
+                {
+                    throw new ArgumentException($"Invalid 'find' value: {configRule.Find}. Must be string or array of strings.");
+                }
+                
+                // Create replacement rule for each pattern
+                foreach (var pattern in findPatterns)
+                {
+                    AddReplacement(pattern, configRule.Replace, configRule.Regex, configRule.CaseInsensitive);
+                }
+            }
         }
 
         public string ProcessText(string text)
