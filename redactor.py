@@ -7,6 +7,8 @@ import argparse
 import json
 import re
 import sys
+import time
+import gc
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import fitz  # PyMuPDF
@@ -16,7 +18,6 @@ import shutil
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 
 class PDFRedactor:
     """Main class for PDF text redaction"""
@@ -41,15 +42,12 @@ class PDFRedactor:
             config = json.load(f)
             
         for rule in config.get('replacements', []):
-            # Support both single string and array of strings for 'find'
             find_patterns = rule['find']
             if isinstance(find_patterns, str):
-                # Single pattern (backward compatibility)
                 find_patterns = [find_patterns]
             elif not isinstance(find_patterns, list):
                 raise ValueError(f"Invalid 'find' value: {find_patterns}. Must be string or array of strings.")
             
-            # Create replacement rule for each pattern
             for pattern in find_patterns:
                 self.add_replacement(
                     pattern,
@@ -58,7 +56,6 @@ class PDFRedactor:
                     rule.get('caseInsensitive', False)
                 )
         
-        # Load compression settings if present
         if 'compression' in config:
             self.preserve_compression = config['compression'].get('preserve', True)
             self.compression_level = config['compression'].get('level', 9)
@@ -73,29 +70,21 @@ class PDFRedactor:
                 result = re.sub(rule['find'], rule['replace'], result, flags=flags)
             else:
                 if rule.get('caseInsensitive', False):
-                    # For case insensitive string replacement, we need to find all occurrences
-                    # while preserving the original case of the surrounding text
                     find_text = rule['find']
                     replace_text = rule['replace']
                     result_lower = result.lower()
                     find_lower = find_text.lower()
                     
-                    # Find all positions where the text occurs (case insensitive)
                     new_result = ""
                     last_pos = 0
                     pos = result_lower.find(find_lower)
                     
                     while pos != -1:
-                        # Add text before the match
                         new_result += result[last_pos:pos]
-                        # Add the replacement
                         new_result += replace_text
-                        # Move past the match
                         last_pos = pos + len(find_text)
-                        # Find next occurrence
                         pos = result_lower.find(find_lower, last_pos)
                     
-                    # Add remaining text
                     new_result += result[last_pos:]
                     result = new_result
                 else:
@@ -116,7 +105,6 @@ class PDFRedactor:
                 'compression_objects': 0
             }
             
-            # Check for compressed objects
             for xref in range(1, doc.xref_length()):
                 try:
                     if doc.xref_is_stream(xref):
@@ -136,11 +124,10 @@ class PDFRedactor:
         try:
             doc = fitz.open(input_path)
             
-            # Save with no compression for easier text manipulation
             doc.save(output_path, 
-                    deflate=False,  # No compression
-                    garbage=4,      # Maximum garbage collection
-                    clean=True)     # Clean up unused objects
+                    deflate=False,
+                    garbage=4,
+                    clean=True)
             
             doc.close()
             return True
@@ -153,12 +140,10 @@ class PDFRedactor:
         try:
             doc = fitz.open(input_path)
             
-            # Save with compression
             doc.save(output_path,
-                    deflate=True,           # Enable compression
-                    deflate_level=level,    # Compression level (0-9)
-                    garbage=4,              # Maximum garbage collection
-                    clean=True)             # Clean up unused objects
+                    deflate=True,
+                    garbage=4,
+                    clean=True)
             
             doc.close()
             return True
@@ -166,114 +151,170 @@ class PDFRedactor:
             logger.error(f"Error compressing PDF: {str(e)}")
             return False
     
+    def rgb_from_srgb(self, srgb: int) -> Tuple[float, float, float]:
+        """Convert sRGB integer to RGB float tuple"""
+        return (
+            ((srgb >> 16) & 0xFF) / 255.0,
+            ((srgb >> 8) & 0xFF) / 255.0,
+            (srgb & 0xFF) / 255.0
+        )
+    
     def redact_pdf(self, input_path: str, output_path: str) -> bool:
         """Process a single PDF file with compression handling"""
         try:
             logger.info(f"Processing: {input_path}")
             
-            # Get PDF info
+            if not Path(input_path).is_file():
+                logger.error(f"Input file {input_path} does not exist or is not accessible")
+                return False
+            
             pdf_info = self.get_pdf_info(input_path)
             logger.debug(f"PDF info: {pdf_info}")
             
-            # Create temporary file for processing
             with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_file:
                 temp_path = temp_file.name
             
             try:
-                # Decompress if needed for better text processing
+                logger.debug(f"Created temporary file: {temp_path}")
                 if pdf_info.get('uses_compression', False):
                     logger.info("Decompressing PDF for processing...")
                     if not self.decompress_pdf(input_path, temp_path):
+                        logger.info("Decompression failed, copying input file instead")
                         shutil.copy2(input_path, temp_path)
                 else:
+                    logger.info("Copying input file to temporary location")
                     shutil.copy2(input_path, temp_path)
                 
-                # Open PDF for processing
+                if not Path(temp_path).exists():
+                    logger.error(f"Temporary file {temp_path} was not created")
+                    return False
+                
+                logger.debug(f"Opening temporary file: {temp_path}")
                 pdf_document = fitz.open(temp_path)
                 
-                # Track if any changes were made
-                changes_made = False
-                
-                # Process each page
-                for page_num in range(len(pdf_document)):
-                    page = pdf_document[page_num]
+                try:
+                    changes_made = False
                     
-                    # Get all text blocks with their positions
-                    blocks = page.get_text("dict")
+                    base_font_map = {
+                        "Helvetica": "helv",
+                        "Arial": "helv",
+                        "Times-Roman": "tiro",
+                        "Times New Roman": "tiro",
+                        "Courier": "cour",
+                        "Courier New": "cour",
+                        "Symbol": "symb",
+                        "ZapfDingbats": "zadb",
+                        # Add more mappings as needed
+                    }
                     
-                    # Process each text block
-                    for block in blocks.get("blocks", []):
-                        if block.get("type") == 0:  # Text block
-                            for line in block.get("lines", []):
-                                for span in line.get("spans", []):
-                                    original_text = span.get("text", "")
-                                    if not original_text.strip():
-                                        continue
-                                    
-                                    processed_text = self.process_text(original_text)
-                                    
-                                    if processed_text != original_text:
-                                        changes_made = True
-                                        # Get the bounding box of the text
-                                        bbox = fitz.Rect(span["bbox"])
+                    for page_num in range(len(pdf_document)):
+                        page = pdf_document[page_num]
+                        
+                        blocks = page.get_text("dict")["blocks"]
+                        
+                        fonts = page.get_fonts(full=True)
+                        font_dict = {}
+                        for font in fonts:
+                            if len(font) > 6 and font[6] is not None:
+                                ref_name = font[4]
+                                buffer = font[6]
+                                font_dict[ref_name] = buffer
+                        
+                        to_redact = []
+                        to_insert = []
+                        
+                        for block in blocks:
+                            if block.get("type") == 0:
+                                for line in block.get("lines", []):
+                                    for span in line.get("spans", []):
+                                        original_text = span.get("text", "")
+                                        if not original_text.strip():
+                                            continue
                                         
-                                        # Add redaction annotation
-                                        page.add_redact_annot(bbox)
+                                        processed_text = self.process_text(original_text)
                                         
-                                        # Store the replacement text and position
-                                        font_size = span.get("size", 11)
-                                        font_name = span.get("font", "Helvetica")
-                                        text_color = span.get("color", 0)
-                                        
-                                        # Apply redactions
-                                        page.apply_redactions()
-                                        
-                                        # Add replacement text
-                                        page.insert_text(
-                                            bbox.tl,  # top-left point
-                                            processed_text,
-                                            fontsize=font_size,
-                                            fontname=font_name,
-                                            color=text_color
-                                        )
+                                        if processed_text != original_text:
+                                            changes_made = True
+                                            bbox = fitz.Rect(span["bbox"])
+                                            to_redact.append(bbox)
+                                            orig_font = span.get("font", "Helvetica")
+                                            font_size = span.get("size", 11)
+                                            text_color = self.rgb_from_srgb(span.get("color", 0))
+                                            font_buffer = font_dict.get(orig_font, None)
+                                            # FIXED: Use span["origin"] (baseline position) instead of bbox for accurate placement
+                                            origin = fitz.Point(span["origin"])
+                                            to_insert.append((origin, processed_text, orig_font, font_size, text_color, font_buffer))
+                        
+                        for bbox in to_redact:
+                            page.add_redact_annot(bbox)
+                        
+                        page.apply_redactions()
+                        
+                        for origin, text, fontname, fontsize, color, fontbuffer in to_insert:
+                            if fontbuffer is not None:
+                                page.insert_font(fontname=fontname, fontbuffer=fontbuffer)
+                                # FIXED: Insert at origin instead of bbox.tl
+                                page.insert_text(
+                                    origin,
+                                    text,
+                                    fontname=fontname,
+                                    fontsize=fontsize,
+                                    color=color
+                                )
+                            else:
+                                standard_name = base_font_map.get(fontname, "helv")
+                                # FIXED: Insert at origin instead of bbox.tl
+                                page.insert_text(
+                                    origin,
+                                    text,
+                                    fontname=standard_name,
+                                    fontsize=fontsize,
+                                    color=color
+                                )
+                    
+                    if changes_made:
+                        logger.info("Applied text replacements")
+                    else:
+                        logger.info("No text replacements were needed")
+                    
+                    logger.debug(f"Saving output to: {output_path}")
+                    if self.preserve_compression and pdf_info.get('uses_compression', False):
+                        logger.info("Saving with compression...")
+                        pdf_document.save(output_path,
+                                        deflate=True,
+                                        garbage=4,
+                                        clean=True)
+                    else:
+                        logger.info("Saving without compression...")
+                        pdf_document.save(output_path,
+                                        garbage=4,
+                                        clean=True)
+                    
+                    original_size = Path(input_path).stat().st_size
+                    final_size = Path(output_path).stat().st_size
+                    logger.info(f"Original size: {original_size:,} bytes")
+                    logger.info(f"Final size: {final_size:,} bytes ({(final_size - original_size) / original_size * 100:+.1f}%)")
+                    logger.info(f"Successfully created: {output_path}")
+                    
+                    return True
                 
-                # Save the modified PDF
-                if changes_made:
-                    logger.info(f"Applied text replacements to {page_num + 1} pages")
-                else:
-                    logger.info("No text replacements were needed")
-                
-                # Save with appropriate compression
-                if self.preserve_compression and pdf_info.get('uses_compression', False):
-                    logger.info(f"Saving with compression (level {self.compression_level})...")
-                    pdf_document.save(output_path,
-                                    deflate=True,
-                                    deflate_level=self.compression_level,
-                                    garbage=4,
-                                    clean=True)
-                else:
-                    pdf_document.save(output_path,
-                                    garbage=4,
-                                    clean=True)
-                
-                pdf_document.close()
-                
-                # Log size comparison
-                original_size = Path(input_path).stat().st_size
-                final_size = Path(output_path).stat().st_size
-                size_diff = final_size - original_size
-                size_pct = (size_diff / original_size) * 100 if original_size > 0 else 0
-                
-                logger.info(f"Original size: {original_size:,} bytes")
-                logger.info(f"Final size: {final_size:,} bytes ({size_pct:+.1f}%)")
-                logger.info(f"Successfully created: {output_path}")
-                
-                return True
-                
+                finally:
+                    pdf_document.close()
+                    gc.collect()
+                    time.sleep(0.5)
+                    
             finally:
-                # Clean up temporary file
                 if Path(temp_path).exists():
-                    Path(temp_path).unlink()
+                    for _ in range(5):
+                        try:
+                            Path(temp_path).unlink()
+                            logger.debug(f"Successfully deleted temp file: {temp_path}")
+                            break
+                        except PermissionError as e:
+                            logger.warning(f"Failed to delete temp file {temp_path}: {str(e)}. Retrying...")
+                            time.sleep(0.3)
+                    else:
+                        logger.warning(f"Could not delete temp file {temp_path}. It will remain in the temp directory.")
                     
         except Exception as e:
             logger.error(f"Error processing {input_path}: {str(e)}")
@@ -284,10 +325,8 @@ class PDFRedactor:
         input_path = Path(input_dir)
         output_path = Path(output_dir)
         
-        # Create output directory if it doesn't exist
         output_path.mkdir(parents=True, exist_ok=True)
         
-        # Process all PDF files
         pdf_files = list(input_path.glob("*.pdf"))
         logger.info(f"Found {len(pdf_files)} PDF files to process")
         
@@ -298,20 +337,17 @@ class PDFRedactor:
         for pdf_file in pdf_files:
             output_file = output_path / pdf_file.name
             
-            # Track sizes
             total_original_size += pdf_file.stat().st_size
             
             if self.redact_pdf(str(pdf_file), str(output_file)):
                 success_count += 1
                 total_final_size += output_file.stat().st_size
         
-        # Summary
         logger.info(f"Successfully processed {success_count}/{len(pdf_files)} files")
         if success_count > 0:
             size_diff = total_final_size - total_original_size
             size_pct = (size_diff / total_original_size) * 100 if total_original_size > 0 else 0
             logger.info(f"Total size change: {size_diff:,} bytes ({size_pct:+.1f}%)")
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -327,26 +363,22 @@ Examples:
         """
     )
     
-    # Input/Output arguments
     parser.add_argument('input', nargs='?', help='Input PDF file')
     parser.add_argument('output', nargs='?', help='Output PDF file')
     parser.add_argument('--input-dir', help='Input directory for batch processing')
     parser.add_argument('--output-dir', help='Output directory for batch processing')
     
-    # Replacement arguments
     parser.add_argument('--find', help='Text to find')
     parser.add_argument('--replace', help='Replacement text')
     parser.add_argument('--regex', action='store_true', help='Use regular expression matching')
     parser.add_argument('--config', help='Configuration file with replacement rules')
     
-    # Compression options
     parser.add_argument('--no-compress', action='store_true', 
                        help='Do not compress output PDF')
     parser.add_argument('--compression-level', type=int, default=9, 
                        choices=range(0, 10), metavar='0-9',
                        help='Compression level (0=none, 9=maximum, default: 9)')
     
-    # Other options
     parser.add_argument('--info', action='store_true', 
                        help='Show PDF information and exit')
     parser.add_argument('--verbose', '-v', action='store_true', 
@@ -357,7 +389,6 @@ Examples:
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Info mode
     if args.info:
         if not args.input:
             parser.error("--info requires an input file")
@@ -376,39 +407,31 @@ Examples:
                     print(f"  {key}: {value}")
         sys.exit(0)
     
-    # Validate arguments
     if args.input_dir and args.output_dir:
-        # Batch mode
         if not args.config and not (args.find and args.replace):
             parser.error("Batch mode requires either --config or --find/--replace")
     elif args.input and args.output:
-        # Single file mode
         if not args.config and not (args.find and args.replace):
             parser.error("Single file mode requires either --config or --find/--replace")
     else:
         parser.error("Specify either input/output files or --input-dir/--output-dir")
     
-    # Create redactor instance
     redactor = PDFRedactor()
     
-    # Set compression options
     redactor.preserve_compression = not args.no_compress
     redactor.compression_level = args.compression_level
     
-    # Load replacements
     if args.config:
         redactor.load_config(args.config)
     
     if args.find and args.replace:
         redactor.add_replacement(args.find, args.replace, args.regex)
     
-    # Process files
     if args.input_dir and args.output_dir:
         redactor.process_directory(args.input_dir, args.output_dir)
     else:
         success = redactor.redact_pdf(args.input, args.output)
         sys.exit(0 if success else 1)
-
 
 if __name__ == "__main__":
     main()
