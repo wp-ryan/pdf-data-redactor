@@ -216,7 +216,9 @@ python3 redactor.py input.pdf output.pdf --find "John Doe" --replace "[REDACTED]
 
 ### Configuration File Usage
 
-Use a JSON configuration file to define multiple replacement rules:
+Use a JSON configuration file to define multiple replacement rules. Configuration files support additional options like case-insensitive matching and allow you to define multiple patterns efficiently.
+
+**Note:** Case-insensitive matching is only available through configuration files using the `caseInsensitive` property.
 
 1. **Create a configuration file** (e.g., `config.json`):
    ```json
@@ -348,6 +350,7 @@ Create `names-config.json`:
     {
       "find": ["John Doe", "Jane Smith", "Bob Johnson"],
       "replace": "[NAME REDACTED]",
+      "regex": false,
       "caseInsensitive": true
     }
   ]
